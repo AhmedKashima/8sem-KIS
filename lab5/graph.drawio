@@ -1,0 +1,79 @@
+xml_lines <- c(
+  '<?xml version="1.0" encoding="UTF-8"?>',
+  '<mxfile host="Electron" modified="2023-11-09T00:00:00.000Z" agent="Mozilla/5.0" version="22.1.2" type="device">',
+  '  <diagram id="diagram_1" name="Page-1">',
+  '    <mxGraphModel dx="1000" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="800" math="1" shadow="0">',
+  '      <root>',
+  '        <mxCell id="0" />',
+  '        <mxCell id="1" parent="0" />'
+)
+
+# Функция для вычисления ID состояния
+get_id <- function(i, j) {
+  if(j == 0) return(i)
+  if(j == 1) return(11 + i)
+  if(j == 2) return(21 + i)
+  if(j == 3) return(30 + i)
+}
+
+# Генерация узлов
+for(j in 0:3) {
+  max_i <- 10 - j
+  for(i in 0:max_i) {
+    sid <- get_id(i, j)
+    x <- 50 + i * 110
+    y <- 50 + j * 130
+    xml_lines <- c(xml_lines, sprintf('        <mxCell id="S%d" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;S&lt;sub&gt;%d&lt;/sub&gt;&lt;/font&gt;" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="%d" y="%d" width="60" height="60" as="geometry" /></mxCell>', sid, sid, x, y))
+  }
+}
+
+# Генерация горизонтальных связей (поступление и обслуживание)
+for(j in 0:3) {
+  max_i <- 10 - j
+  nw <- 3 - j
+  if (max_i > 0) {
+    for(i in 0:(max_i-1)) {
+      s1 <- get_id(i, j)
+      s2 <- get_id(i+1, j)
+      
+      # Интенсивность lambda (система разомкнутая, всегда lambda)
+      xml_lines <- c(xml_lines, sprintf('        <mxCell id="E_%d_%d_lam" value="&lt;span style=&quot;font-size: 16px;&quot;&gt;&amp;lambda;&lt;/span&gt;" style="endArrow=classic;html=1;exitX=1;exitY=0.25;entryX=0;entryY=0.25;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="S%d" target="S%d"><mxGeometry relative="1" as="geometry" /></mxCell>', s1, s2, s1, s2))
+      
+      # Интенсивность mu
+      mu_mult <- min(i+1, nw)
+      mu_str <- ifelse(mu_mult == 1, "&amp;mu;", sprintf("%d&amp;mu;", mu_mult))
+      xml_lines <- c(xml_lines, sprintf('        <mxCell id="E_%d_%d_mu" value="&lt;span style=&quot;font-size: 16px;&quot;&gt;%s&lt;/span&gt;" style="endArrow=classic;html=1;exitX=0;exitY=0.75;entryX=1;entryY=0.75;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="S%d" target="S%d"><mxGeometry relative="1" as="geometry" /></mxCell>', s2, s1, mu_str, s2, s1))
+    }
+  }
+}
+
+# Генерация вертикальных связей (поломки и восстановления)
+for(j in 0:2) {
+  max_i <- 10 - j
+  nu_mult <- 3 - j
+  gamma_mult <- j + 1
+  nu_str <- ifelse(nu_mult == 1, "&amp;nu;", sprintf("%d&amp;nu;", nu_mult))
+  gamma_str <- ifelse(gamma_mult == 1, "&amp;gamma;", sprintf("%d&amp;gamma;", gamma_mult))
+  
+  for(i in 0:max_i) {
+    s1 <- get_id(i, j)
+    if(i == max_i) {
+      # Диагональный переход (отказ при заполненной очереди -> выкидываем 1 заявку)
+      s2 <- get_id(i-1, j+1)
+      xml_lines <- c(xml_lines, sprintf('        <mxCell id="E_%d_%d_nu" value="&lt;span style=&quot;font-size: 16px;&quot;&gt;%s&lt;/span&gt;" style="endArrow=classic;html=1;exitX=0;exitY=1;entryX=1;entryY=0;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="S%d" target="S%d"><mxGeometry relative="1" as="geometry" /></mxCell>', s1, s2, nu_str, s1, s2))
+    } else {
+      # Строго вниз (отказ канала, места хватает)
+      s2 <- get_id(i, j+1)
+      xml_lines <- c(xml_lines, sprintf('        <mxCell id="E_%d_%d_nu" value="&lt;span style=&quot;font-size: 16px;&quot;&gt;%s&lt;/span&gt;" style="endArrow=classic;html=1;exitX=0.25;exitY=1;entryX=0.25;entryY=0;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="S%d" target="S%d"><mxGeometry relative="1" as="geometry" /></mxCell>', s1, s2, nu_str, s1, s2))
+      
+      # Строго вверх (восстановление канала)
+      xml_lines <- c(xml_lines, sprintf('        <mxCell id="E_%d_%d_gam" value="&lt;span style=&quot;font-size: 16px;&quot;&gt;%s&lt;/span&gt;" style="endArrow=classic;html=1;exitX=0.75;exitY=0;entryX=0.75;entryY=1;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="S%d" target="S%d"><mxGeometry relative="1" as="geometry" /></mxCell>', s2, s1, gamma_str, s2, s1))
+    }
+  }
+}
+
+xml_lines <- c(xml_lines, '      </root>', '    </mxGraphModel>', '  </diagram>', '</mxfile>')
+
+# Запись в файл
+writeLines(xml_lines, "graph.drawio", useBytes = TRUE)
+cat("Файл 'graph.drawio' успешно создан в текущей директории!\nОткройте его в draw.io (или diagrams.net) и экспортируйте как картинку.")
